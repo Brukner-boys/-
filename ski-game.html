@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>3D Infinite Ski Game</title>
+  <style>
+    body { margin: 0; overflow: hidden; font-family: sans-serif; }
+    #score {
+      position: absolute; top: 10px; left: 10px; color: white;
+      background: rgba(0,0,0,0.5); padding: 8px 12px; border-radius: 8px;
+      font-size: 16px;
+    }
+    #gameOverScreen {
+      position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+      background: rgba(0,0,0,0.85); padding: 30px; color: white; text-align: center;
+      display: none; border-radius: 10px;
+    }
+    button {
+      padding: 10px 20px; margin-top: 15px; font-size: 16px;
+    }
+  </style>
+</head>
+<body>
+  <div id="score">Score: 0 | Coins: 0 | Speed: 0.50 | Level: 1</div>
+  <div id="gameOverScreen">
+    <h2 id="gameOverText">Game Over!</h2>
+    <p id="coinInfo"></p>
+    <button onclick="restartGame()">Restart</button>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+  <script>
+    let scene, camera, renderer, player, score = 0, coinsCollected = 0;
+    let trees = [], ramps = [], coins = [], keys = {};
+    let speed = 0.5, level = 1, maxX = 20, playing = true;
+    let verticalVelocity = 0, gravity = 0.006;
+    const scoreDiv = document.getElementById("score");
+    const gameOverScreen = document.getElementById("gameOverScreen");
+    const gameOverText = document.getElementById("gameOverText");
+    const coinInfo = document.getElementById("coinInfo");
+
+    const jumpSound = new Audio("https://cdn.pixabay.com/download/audio/2022/03/15/audio_4df93db77b.mp3");
+    const crashSound = new Audio("https://cdn.pixabay.com/download/audio/2022/03/14/audio_e7e25fae32.mp3");
+    const coinSound = new Audio("https://cdn.pixabay.com/download/audio/2022/03/28/audio_4310e346a0.mp3");
+
+    function init() {
+      scene = new THREE.Scene();
+      scene.fog = new THREE.Fog(0xaaddff, 0, 200);
+
+      camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+      camera.position.set(0, 5, 10);
+
+      renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      document.body.appendChild(renderer.domElement);
+
+      // Light
+      const light = new THREE.DirectionalLight(0xffffff, 1);
+      light.position.set(10, 20, 10);
+      scene.add(light);
+
+      // Ground
+      const ground = new THREE.Mesh(
+        new THREE.PlaneGeometry(100, 70000),
+        new THREE.MeshLambertMaterial({ color: 0xffffff })
+      );
+      ground.rotation.x = -Math.PI / 2;
+      ground.position.z = -5000;
+      scene.add(ground);
+
+      // Borders
+      const borderMat = new THREE.MeshBasicMaterial({ color: 0x002266 });
+      for (let side of [-1, 1]) {
+        const border = new THREE.Mesh(
+          new THREE.BoxGeometry(1, 3, 70000),
+          borderMat
+        );
+        border.position.set(side * maxX, 1.5, -5000);
+        scene.add(border);
+      }
+
+      // Player (ball)
+      player = new THREE.Mesh(
+        new THREE.SphereGeometry(1, 32, 32),
+        new THREE.MeshLambertMaterial({ color: 0xff4444 })
+      );
+      player.position.y = 1;
+      scene.add(player);
+
+      // Trees
+      for (let i = 0; i < 1000; i++) {
+        const type = i % 3;
+        let geometry;
+        if (type === 0)
+          geometry = new THREE.ConeGeometry(1, 3, 8);
+        else if (type === 1)
+          geometry = new THREE.CylinderGeometry(0.5, 0.5, 2.5, 8);
+        else
+          geometry = new THREE.DodecahedronGeometry(1.2);
+        const tree = new THREE.Mesh(geometry, new THREE.MeshLambertMaterial({ color: 0x006600 }));
+        tree.position.set((Math.random() - 0.5) * 2 * maxX, 1.5, -Math.random() * 70000);
+        scene.add(tree);
+        trees.push(tree);
+      }
+
+      // Ramps
+      for (let i = 0; i < 1400; i++) {
+        const ramp = new THREE.Mesh(
+          new THREE.CylinderGeometry(1, 1, 5, 12, 1, false, 0, Math.PI),
+          new THREE.MeshLambertMaterial({ color: 0xff8800 })
+        );
+        ramp.rotation.z = Math.PI;
+        ramp.rotation.x = -Math.PI / 2.5;
+        ramp.position.set((Math.random() - 0.5) * 2 * maxX, 0.5, -Math.random() * 70000);
+        scene.add(ramp);
+        ramps.push(ramp);
+      }
+
+      // Coins
+      for (let i = 0; i < 130; i++) {
+        const coin = new THREE.Mesh(
+          new THREE.TorusGeometry(0.5, 0.15, 8, 16),
+          new THREE.MeshLambertMaterial({ color: 0xffd700 })
+        );
+        coin.rotation.x = Math.PI / 2;
+        coin.position.set((Math.random() - 0.5) * 2 * maxX, 1, -Math.random() * 9000);
+        scene.add(coin);
+        coins.push(coin);
+      }
+
+      // Controls
+      window.addEventListener('keydown', e => keys[e.key] = true);
+      window.addEventListener('keyup', e => keys[e.key] = false);
+      window.addEventListener('resize', onWindowResize);
+
+      animate();
+    }
+
+    function animate() {
+      if (!playing) return;
+      requestAnimationFrame(animate);
+
+      // Movement
+      if (keys["ArrowLeft"]) player.position.x -= 0.3;
+      if (keys["ArrowRight"]) player.position.x += 0.3;
+      if (keys["ArrowUp"]) speed += 0.01;
+      if (keys["ArrowDown"]) speed = Math.max(0.1, speed - 0.01);
+
+      // Gravity + Jump
+      player.position.y += verticalVelocity;
+      verticalVelocity -= gravity;
+      if (player.position.y < 1) {
+        player.position.y = 1;
+        verticalVelocity = 0;
+      }
+
+      // Forward
+      player.position.z -= speed;
+      camera.position.set(player.position.x, player.position.y + 3, player.position.z + 10);
+      camera.lookAt(player.position.x, player.position.y, player.position.z);
+
+      // Update score
+      score = Math.floor(Math.abs(player.position.z));
+      scoreDiv.innerText = `Score: ${score} | Coins: ${coinsCollected} | Speed: ${speed.toFixed(2)} | Level: ${level}`;
+
+      if (score > level * 1500) {
+        level++;
+        speed += 1;
+      }
+
+      // Borders
+      if (Math.abs(player.position.x) > maxX) {
+        crashSound.play();
+        endGame("?? You fell off the edge!");
+        return;
+      }
+
+      // Trees
+      for (const tree of trees) {
+        if (player.position.distanceTo(tree.position) < 1.5) {
+          crashSound.play();
+          endGame("?? You hit a tree!");
+          return;
+        }
+      }
+
+      // Ramps
+      for (const ramp of ramps) {
+        if (player.position.distanceTo(ramp.position) < 2 && verticalVelocity === 0) {
+          jumpSound.play();
+          verticalVelocity = 0.3; // Higher jump
+        }
+      }
+
+      // Coins
+      for (let i = coins.length - 1; i >= 0; i--) {
+        if (player.position.distanceTo(coins[i].position) < 1.2) {
+          coinSound.play();
+          coinsCollected++;
+          score += 1000;
+          scene.remove(coins[i]);
+          coins.splice(i, 1);
+        }
+      }
+
+      renderer.render(scene, camera);
+    }
+
+    function endGame(msg) {
+      playing = false;
+      gameOverText.innerText = msg;
+      coinInfo.innerText = `Coins collected: ${coinsCollected}`;
+      gameOverScreen.style.display = "block";
+    }
+
+    function restartGame() {
+      location.reload();
+    }
+
+    function onWindowResize() {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+
+    init();
+  </script>
+</body>
+</html>

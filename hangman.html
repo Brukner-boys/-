@@ -1,0 +1,790 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hangman — איש תלוי</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f0f4ff;--card:#fff;--primary:#4f6ef7;--green:#22c55e;--red:#ef4444;
+  --orange:#f97316;--text:#1e293b;--muted:#64748b;--border:#e2e8f0;
+  --radius:14px;--shadow:0 4px 20px rgba(0,0,0,.08);
+}
+body{
+  font-family:system-ui,-apple-system,'Segoe UI',sans-serif;
+  background:linear-gradient(135deg,#e0e7ff 0%,#f0fdf4 100%);
+  min-height:100vh;color:var(--text);
+  display:flex;align-items:center;justify-content:center;padding:16px;
+}
+.screen{width:100%;max-width:700px;display:none}
+.screen.active{display:block}
+
+/* lang toggle */
+.lang-bar{display:flex;justify-content:flex-end;margin-bottom:12px;gap:6px}
+.lang-btn{
+  background:var(--card);border:2px solid var(--border);border-radius:99px;
+  padding:4px 14px;font-size:.8rem;font-weight:700;cursor:pointer;
+  color:var(--muted);transition:all .15s;
+}
+.lang-btn.active{background:var(--primary);color:#fff;border-color:var(--primary)}
+
+/* LEVEL SELECT */
+#screen-level{text-align:center}
+.title-block{margin-bottom:28px}
+.title-block h1{
+  font-size:clamp(2rem,5vw,3rem);font-weight:900;letter-spacing:-1px;
+  background:linear-gradient(135deg,var(--primary),#a855f7);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+}
+.title-block .subtitle{font-size:1.05rem;color:var(--muted);margin-top:6px}
+.levels-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
+@media(max-width:400px){.levels-grid{grid-template-columns:1fr}}
+.level-btn{
+  background:var(--card);border:2px solid transparent;border-radius:var(--radius);
+  padding:20px 14px;cursor:pointer;transition:transform .15s,box-shadow .15s;
+  box-shadow:var(--shadow);text-align:center;
+}
+.level-btn:hover{transform:translateY(-3px);box-shadow:0 8px 28px rgba(0,0,0,.14)}
+.level-btn.l1{border-color:var(--green)}.level-btn.l2{border-color:#06b6d4}
+.level-btn.l3{border-color:var(--orange)}.level-btn.l4{border-color:var(--red)}
+.level-badge{font-size:1.8rem;margin-bottom:6px}
+.level-name{font-size:1.05rem;font-weight:800;margin-bottom:2px}
+.level-desc-a{font-size:.82rem;color:var(--muted);font-weight:600}
+.level-desc-b{font-size:.78rem;color:var(--muted);margin-top:2px}
+
+/* GAME SCREEN */
+#screen-game{background:var(--card);border-radius:20px;box-shadow:var(--shadow);padding:22px 18px;position:relative}
+.game-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+.level-tag{
+  font-size:.78rem;font-weight:700;padding:4px 12px;border-radius:99px;
+  text-transform:uppercase;letter-spacing:.5px;
+}
+.level-tag.l1{background:#dcfce7;color:#15803d}.level-tag.l2{background:#cffafe;color:#0e7490}
+.level-tag.l3{background:#ffedd5;color:#c2410c}.level-tag.l4{background:#fee2e2;color:#b91c1c}
+.new-game-btn{
+  background:none;border:2px solid var(--border);border-radius:99px;
+  padding:5px 14px;font-size:.8rem;font-weight:700;cursor:pointer;
+  color:var(--muted);transition:all .15s;
+}
+.new-game-btn:hover{border-color:var(--primary);color:var(--primary)}
+.game-body{display:flex;gap:20px;align-items:flex-start;margin-bottom:18px}
+@media(max-width:500px){.game-body{flex-direction:column;align-items:center}}
+.gallows-wrap{flex-shrink:0}
+#gallows-svg{width:155px;height:195px}
+.word-col{flex:1;min-width:0;display:flex;flex-direction:column;gap:12px}
+
+/* hint */
+.hint-btn{
+  background:none;border:2px dashed var(--border);border-radius:99px;
+  padding:5px 14px;font-size:.82rem;font-weight:600;cursor:pointer;
+  color:var(--muted);transition:all .15s;width:fit-content;
+}
+.hint-btn:hover{border-color:#eab308;color:#92400e}
+.hint-text{
+  display:none;font-size:.88rem;font-weight:700;color:#92400e;
+  background:#fef3c7;border-radius:8px;padding:4px 12px;width:fit-content;
+}
+.hint-text.visible{display:block}
+
+/* word display */
+.word-display{display:flex;flex-wrap:wrap;gap:5px;align-items:flex-end}
+.letter-slot{display:flex;flex-direction:column;align-items:center;gap:3px}
+.revealed{font-size:1.5rem;font-weight:900;min-height:1.7rem;min-width:1.3rem;text-align:center;color:var(--text)}
+.revealed.pop{animation:pop .3s ease}
+@keyframes pop{0%{transform:scale(.5);opacity:0}70%{transform:scale(1.2)}100%{transform:scale(1);opacity:1}}
+.underline{width:100%;height:3px;background:var(--text);border-radius:2px;min-width:18px}
+.lives-bar{display:flex;gap:4px;align-items:center}
+.life{font-size:1rem;transition:opacity .3s}.life.lost{opacity:.15}
+.wrong-section{font-size:.82rem}
+.wrong-label{color:var(--muted);font-weight:600;margin-bottom:4px}
+.wrong-letters{display:flex;flex-wrap:wrap;gap:4px}
+.wrong-letter{
+  background:#fee2e2;color:var(--red);font-weight:800;border-radius:6px;
+  width:26px;height:26px;display:flex;align-items:center;justify-content:center;
+  font-size:.85rem;
+}
+
+/* keyboard */
+.keyboard{display:flex;flex-wrap:wrap;gap:5px;justify-content:center}
+.key-btn{
+  width:34px;height:34px;border:2px solid var(--border);border-radius:8px;
+  font-size:.88rem;font-weight:800;cursor:pointer;background:#f8fafc;
+  color:var(--text);transition:all .12s;
+}
+.key-btn:hover:not(:disabled){background:var(--primary);color:#fff;border-color:var(--primary);transform:translateY(-2px)}
+.key-btn:disabled{cursor:not-allowed;opacity:.4}
+.key-btn.correct{background:#dcfce7;border-color:var(--green);color:#15803d}
+.key-btn.wrong{background:#fee2e2;border-color:var(--red);color:var(--red)}
+
+/* overlay */
+.overlay{
+  display:none;position:absolute;inset:0;border-radius:20px;
+  background:rgba(255,255,255,.96);flex-direction:column;align-items:center;
+  justify-content:center;gap:14px;text-align:center;padding:24px;z-index:10;
+}
+.overlay.show{display:flex}
+.overlay-emoji{font-size:3.5rem}
+.overlay-title{font-size:1.7rem;font-weight:900}
+.overlay-title.win{color:var(--green)}.overlay-title.lose{color:var(--red)}
+.overlay-word{font-size:2rem;font-weight:900;letter-spacing:3px;color:var(--primary)}
+.overlay-sub{color:var(--muted);font-size:.9rem}
+.overlay-actions{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:6px}
+.btn-primary{
+  background:var(--primary);color:#fff;border:none;border-radius:99px;
+  padding:10px 24px;font-size:.95rem;font-weight:800;cursor:pointer;transition:opacity .15s,transform .15s;
+}
+.btn-primary:hover{opacity:.9;transform:translateY(-2px)}
+.btn-secondary{
+  background:#f1f5f9;color:var(--text);border:none;border-radius:99px;
+  padding:10px 24px;font-size:.95rem;font-weight:700;cursor:pointer;transition:background .15s;
+}
+.btn-secondary:hover{background:var(--border)}
+</style>
+</head>
+<body>
+
+<!-- LEVEL SELECT -->
+<div id="screen-level" class="screen active">
+  <div class="lang-bar">
+    <button class="lang-btn active" onclick="setLang('he')">עברית</button>
+    <button class="lang-btn" onclick="setLang('en')">English</button>
+  </div>
+  <div class="title-block">
+    <h1 id="t-title">איש תלוי</h1>
+    <p class="subtitle" id="t-subtitle">בחר רמה כדי להתחיל</p>
+  </div>
+  <div class="levels-grid">
+    <button class="level-btn l1" onclick="startGame(1)">
+      <div class="level-badge">🌱</div>
+      <div class="level-name" id="t-l1name">מתחיל</div>
+      <div class="level-desc-a" id="t-l1da">3–4 אותיות</div>
+      <div class="level-desc-b" id="t-l1db">מילים קצרות ונפוצות</div>
+    </button>
+    <button class="level-btn l2" onclick="startGame(2)">
+      <div class="level-badge">⭐</div>
+      <div class="level-name" id="t-l2name">קל</div>
+      <div class="level-desc-a" id="t-l2da">4–5 אותיות</div>
+      <div class="level-desc-b" id="t-l2db">אוצר מילים יומיומי</div>
+    </button>
+    <button class="level-btn l3" onclick="startGame(3)">
+      <div class="level-badge">🔥</div>
+      <div class="level-name" id="t-l3name">בינוני</div>
+      <div class="level-desc-a" id="t-l3da">5–6 אותיות</div>
+      <div class="level-desc-b" id="t-l3db">מילים מאתגרות</div>
+    </button>
+    <button class="level-btn l4" onclick="startGame(4)">
+      <div class="level-badge">💎</div>
+      <div class="level-name" id="t-l4name">מתקדם</div>
+      <div class="level-desc-a" id="t-l4da">7+ אותיות</div>
+      <div class="level-desc-b" id="t-l4db">מילים ארוכות ומאתגרות</div>
+    </button>
+  </div>
+</div>
+
+<!-- GAME SCREEN -->
+<div id="screen-game" class="screen">
+  <div class="lang-bar">
+    <button class="lang-btn" onclick="setLang('he')">עברית</button>
+    <button class="lang-btn" onclick="setLang('en')">English</button>
+  </div>
+  <div class="game-header">
+    <span id="level-tag" class="level-tag l1"></span>
+    <button class="new-game-btn" id="t-newgame" onclick="goToLevelSelect()">⬅ משחק חדש</button>
+  </div>
+  <div class="game-body">
+    <div class="gallows-wrap">
+      <svg id="gallows-svg" viewBox="0 0 160 200" xmlns="http://www.w3.org/2000/svg">
+        <line x1="20" y1="190" x2="140" y2="190" stroke="#334155" stroke-width="5" stroke-linecap="round"/>
+        <line x1="60" y1="190" x2="60" y2="10" stroke="#334155" stroke-width="5" stroke-linecap="round"/>
+        <line x1="60" y1="10" x2="110" y2="10" stroke="#334155" stroke-width="5" stroke-linecap="round"/>
+        <line x1="110" y1="10" x2="110" y2="30" stroke="#334155" stroke-width="5" stroke-linecap="round"/>
+        <line x1="60" y1="33" x2="83" y2="10" stroke="#334155" stroke-width="3" stroke-linecap="round" opacity=".35"/>
+        <circle id="hp0" cx="110" cy="46" r="16" stroke="#ef4444" stroke-width="4" fill="none" opacity="0"/>
+        <line   id="hp1" x1="110" y1="62" x2="110" y2="115" stroke="#ef4444" stroke-width="4" stroke-linecap="round" opacity="0"/>
+        <line   id="hp2" x1="110" y1="76" x2="86"  y2="97"  stroke="#ef4444" stroke-width="4" stroke-linecap="round" opacity="0"/>
+        <line   id="hp3" x1="110" y1="76" x2="134" y2="97"  stroke="#ef4444" stroke-width="4" stroke-linecap="round" opacity="0"/>
+        <line   id="hp4" x1="110" y1="115" x2="89" y2="148" stroke="#ef4444" stroke-width="4" stroke-linecap="round" opacity="0"/>
+        <line   id="hp5" x1="110" y1="115" x2="131" y2="148" stroke="#ef4444" stroke-width="4" stroke-linecap="round" opacity="0"/>
+        <line   id="hp6" x1="89"  y1="148" x2="76"  y2="165" stroke="#ef4444" stroke-width="4" stroke-linecap="round" opacity="0"/>
+        <line   id="hp7" x1="131" y1="148" x2="144" y2="165" stroke="#ef4444" stroke-width="4" stroke-linecap="round" opacity="0"/>
+      </svg>
+    </div>
+    <div class="word-col">
+      <div>
+        <button class="hint-btn" id="hint-btn" onclick="showHint()">💡 <span id="t-hintbtn">לחץ לרמז</span></button>
+        <div class="hint-text" id="hint-text"></div>
+      </div>
+      <div id="word-display" class="word-display"></div>
+      <div class="lives-bar" id="lives-bar"></div>
+      <div class="wrong-section">
+        <div class="wrong-label" id="wrong-label"></div>
+        <div class="wrong-letters" id="wrong-letters"></div>
+      </div>
+    </div>
+  </div>
+  <div class="keyboard" id="keyboard"></div>
+
+  <div class="overlay" id="overlay">
+    <div class="overlay-emoji" id="ol-emoji"></div>
+    <div class="overlay-title" id="ol-title"></div>
+    <div class="overlay-word"  id="ol-word"></div>
+    <div class="overlay-sub"   id="ol-sub"></div>
+    <div class="overlay-actions">
+      <button class="btn-primary"   id="ol-again" onclick="startGame(state.level)"></button>
+      <button class="btn-secondary" id="ol-level" onclick="goToLevelSelect()"></button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── TRANSLATIONS ─────────────────────────────────────────
+const T = {
+  he:{
+    title:"איש תלוי", subtitle:"בחר רמה כדי להתחיל",
+    newgame:"⬅ משחק חדש", hintbtn:"לחץ לרמז",
+    wronglabel:"אותיות שגויות",
+    winTitle:"!כל הכבוד", loseTitle:"!ניסיון טוב",
+    wordWas:"המילה הייתה ↑", playAgain:"🔄 שחק שוב", changeLevel:"⬅ שנה רמה",
+    levelTags:["מתחיל","קל","בינוני","מתקדם"],
+    lnames:["מתחיל","קל","בינוני","מתקדם"],
+    ldesca:["3–4 אותיות","4–5 אותיות","5–6 אותיות","7+ אותיות"],
+    ldescb:["מילים קצרות ונפוצות","אוצר מילים יומיומי","מילים בינוניות","מילים ארוכות ומאתגרות"],
+  },
+  en:{
+    title:"Hangman", subtitle:"Choose a level to start",
+    newgame:"⬅ New Game", hintbtn:"Click for hint",
+    wronglabel:"Wrong letters",
+    winTitle:"Great job! 🎉", loseTitle:"Nice try! 😢",
+    wordWas:"The word was ↑", playAgain:"🔄 Play Again", changeLevel:"⬅ Change Level",
+    levelTags:["Beginner","Easy","Medium","Advanced"],
+    lnames:["Beginner","Easy","Medium","Advanced"],
+    ldesca:["3–4 letter words","5–6 letter words","7–8 letter words","9+ letter words"],
+    ldescb:["Short & simple","Daily vocabulary","Challenging","Long & complex"],
+  }
+};
+
+let lang = "he";
+
+// ─── SOFIT (HEBREW FINAL-LETTER) HELPERS ─────────────────
+const SOFIT_TO_BASE = {'ך':'כ','ם':'מ','ן':'נ','ף':'פ','ץ':'צ'};
+const BASE_TO_SOFIT = {'כ':'ך','מ':'ם','נ':'ן','פ':'ף','צ':'ץ'};
+const HE_LETTERS = ['א','ב','ג','ד','ה','ו','ז','ח','ט','י','כ','ל','מ','נ','ס','ע','פ','צ','ק','ר','ש','ת'];
+
+function baseForm(ch){ return SOFIT_TO_BASE[ch] || ch; }
+function isLetterRevealed(ch, guessed){ return guessed.has(baseForm(ch)); }
+function wordContainsGuess(word, letter){
+  return word.includes(letter) || !!(BASE_TO_SOFIT[letter] && word.includes(BASE_TO_SOFIT[letter]));
+}
+
+// ─── ENGLISH WORD BANKS [word, emoji, he-category, en-category] ──
+const WORDS = {
+1:[
+  ["cat","🐾","בעלי חיים","Animals"],["dog","🐾","בעלי חיים","Animals"],["cow","🐾","בעלי חיים","Animals"],
+  ["pig","🐾","בעלי חיים","Animals"],["ant","🐾","בעלי חיים","Animals"],["fox","🐾","בעלי חיים","Animals"],
+  ["hen","🐾","בעלי חיים","Animals"],["owl","🐾","בעלי חיים","Animals"],["bee","🐾","בעלי חיים","Animals"],
+  ["ram","🐾","בעלי חיים","Animals"],["rat","🐾","בעלי חיים","Animals"],["pup","🐾","בעלי חיים","Animals"],
+  ["fly","🐾","בעלי חיים","Animals"],["cub","🐾","בעלי חיים","Animals"],["emu","🐾","בעלי חיים","Animals"],
+  ["arm","🫀","גוף","Body"],["leg","🫀","גוף","Body"],["ear","🫀","גוף","Body"],
+  ["eye","🫀","גוף","Body"],["lip","🫀","גוף","Body"],["jaw","🫀","גוף","Body"],
+  ["rib","🫀","גוף","Body"],["toe","🫀","גוף","Body"],["hip","🫀","גוף","Body"],
+  ["sun","🌿","טבע","Nature"],["sky","🌿","טבע","Nature"],["sea","🌿","טבע","Nature"],
+  ["oak","🌿","טבע","Nature"],["ivy","🌿","טבע","Nature"],["dew","🌿","טבע","Nature"],
+  ["fog","🌿","טבע","Nature"],["mud","🌿","טבע","Nature"],["ice","🌿","טבע","Nature"],
+  ["sap","🌿","טבע","Nature"],["pod","🌿","טבע","Nature"],["pit","🌿","טבע","Nature"],
+  ["ray","🌿","טבע","Nature"],["gem","💎","אבנים יקרות","Gemstones"],
+  ["red","🎨","צבעים","Colors"],["tan","🎨","צבעים","Colors"],
+  ["hat","👜","חפצים","Things"],["cup","👜","חפצים","Things"],["map","👜","חפצים","Things"],
+  ["pen","👜","חפצים","Things"],["box","👜","חפצים","Things"],["bag","👜","חפצים","Things"],
+  ["bed","👜","חפצים","Things"],["key","👜","חפצים","Things"],["net","👜","חפצים","Things"],
+  ["pot","👜","חפצים","Things"],["rug","👜","חפצים","Things"],["jar","👜","חפצים","Things"],
+  ["jug","👜","חפצים","Things"],["tin","👜","חפצים","Things"],["tub","👜","חפצים","Things"],
+  ["fan","👜","חפצים","Things"],["pin","👜","חפצים","Things"],["log","👜","חפצים","Things"],
+  ["rod","👜","חפצים","Things"],["wig","👜","חפצים","Things"],["top","👜","חפצים","Things"],
+  ["web","👜","חפצים","Things"],["wax","👜","חפצים","Things"],["rim","👜","חפצים","Things"],
+  ["bus","🚗","תחבורה","Transport"],["car","🚗","תחבורה","Transport"],
+  ["van","🚗","תחבורה","Transport"],["jet","🚗","תחבורה","Transport"],
+  ["nut","🍎","אוכל","Food"],["pie","🍎","אוכל","Food"],["yam","🍎","אוכל","Food"],
+  ["run","🏃","פעולות","Actions"],["sit","🏃","פעולות","Actions"],["hop","🏃","פעולות","Actions"],
+  ["dig","🏃","פעולות","Actions"],["win","🏃","פעולות","Actions"],["sip","🏃","פעולות","Actions"],
+  ["row","🏃","פעולות","Actions"],["bow","🏃","פעולות","Actions"],["lay","🏃","פעולות","Actions"],
+  ["pay","🏃","פעולות","Actions"],["rub","🏃","פעולות","Actions"],["sew","🏃","פעולות","Actions"],
+  ["tag","🏃","פעולות","Actions"],["tug","🏃","פעולות","Actions"],["nod","🏃","פעולות","Actions"],
+  ["nap","🏃","פעולות","Actions"],["saw","🏃","פעולות","Actions"],["pop","🏃","פעולות","Actions"],
+  ["sad","💭","רגשות","Feelings"],["mad","💭","רגשות","Feelings"],
+  ["joy","💭","רגשות","Feelings"],["shy","💭","רגשות","Feelings"],
+  ["zoo","🏙","מקומות","Places"],["bay","🏙","מקומות","Places"],["lab","🏙","מקומות","Places"],
+  ["vet","👔","מקצועות","Jobs"],["toy","🎮","כיף","Fun"],
+],
+2:[
+  ["camel","🐾","בעלי חיים","Animals"],["eagle","🐾","בעלי חיים","Animals"],["sheep","🐾","בעלי חיים","Animals"],
+  ["tiger","🐾","בעלי חיים","Animals"],["shark","🐾","בעלי חיים","Animals"],["snail","🐾","בעלי חיים","Animals"],
+  ["horse","🐾","בעלי חיים","Animals"],["snake","🐾","בעלי חיים","Animals"],["mouse","🐾","בעלי חיים","Animals"],
+  ["robin","🐾","בעלי חיים","Animals"],["whale","🐾","בעלי חיים","Animals"],["llama","🐾","בעלי חיים","Animals"],
+  ["panda","🐾","בעלי חיים","Animals"],["raven","🐾","בעלי חיים","Animals"],
+  ["apple","🍎","אוכל","Food"],["bread","🍎","אוכל","Food"],["grape","🍎","אוכל","Food"],
+  ["juice","🍎","אוכל","Food"],["lemon","🍎","אוכל","Food"],["olive","🍎","אוכל","Food"],
+  ["pizza","🍎","אוכל","Food"],["candy","🍎","אוכל","Food"],["cream","🍎","אוכל","Food"],
+  ["honey","🍎","אוכל","Food"],["fruit","🍎","אוכל","Food"],["sweet","🍎","אוכל","Food"],
+  ["pasta","🍎","אוכל","Food"],["salad","🍎","אוכל","Food"],["toast","🍎","אוכל","Food"],
+  ["earth","🌿","טבע","Nature"],["flame","🌿","טבע","Nature"],["ocean","🌿","טבע","Nature"],
+  ["river","🌿","טבע","Nature"],["cloud","🌤","מזג אוויר","Weather"],["foggy","🌤","מזג אוויר","Weather"],
+  ["field","🌿","טבע","Nature"],["grass","🌿","טבע","Nature"],["plant","🌿","טבע","Nature"],
+  ["daisy","🌿","טבע","Nature"],["stone","🌿","טבע","Nature"],["storm","🌤","מזג אוויר","Weather"],
+  ["sunny","🌤","מזג אוויר","Weather"],["humid","🌤","מזג אוויר","Weather"],
+  ["chair","📚","בית ספר","School"],["class","📚","בית ספר","School"],["diary","📚","בית ספר","School"],
+  ["globe","📚","בית ספר","School"],["story","📚","בית ספר","School"],["piano","🎵","מוזיקה","Music"],
+  ["uncle","👨‍👩‍👧","אנשים","People"],["angel","👨‍👩‍👧","אנשים","People"],["child","👨‍👩‍👧","אנשים","People"],
+  ["giant","👨‍👩‍👧","אנשים","People"],["nurse","👔","מקצועות","Jobs"],["judge","👔","מקצועות","Jobs"],
+  ["queen","👨‍👩‍👧","אנשים","People"],["clown","🎭","בידור","Entertainment"],
+  ["beach","🏙","מקומות","Places"],["hotel","🏙","מקומות","Places"],["house","🏠","בית","Home"],
+  ["oasis","🏙","מקומות","Places"],["store","🏙","מקומות","Places"],
+  ["flute","🎵","מוזיקה","Music"],["glass","👜","חפצים","Things"],["glove","👜","חפצים","Things"],
+  ["wagon","🚗","תחבורה","Transport"],["jewel","💎","אבנים יקרות","Gemstones"],["brush","👜","חפצים","Things"],
+  ["stamp","👜","חפצים","Things"],["sword","👜","חפצים","Things"],["torch","👜","חפצים","Things"],
+  ["clock","👜","חפצים","Things"],["table","🏠","בית","Home"],["pearl","💎","אבנים יקרות","Gemstones"],
+  ["novel","📖","ספרים","Books"],["image","🎨","אמנות","Art"],
+  ["happy","💭","רגשות","Feelings"],["dizzy","💭","רגשות","Feelings"],["lucky","💭","רגשות","Feelings"],
+  ["funny","💭","רגשות","Feelings"],["young","🎭","תיאור","Adjectives"],["crisp","🎭","תיאור","Adjectives"],
+  ["empty","🎭","תיאור","Adjectives"],["grand","🎭","תיאור","Adjectives"],["quiet","🎭","תיאור","Adjectives"],
+  ["rapid","🎭","תיאור","Adjectives"],["vivid","🎭","תיאור","Adjectives"],["dirty","🎭","תיאור","Adjectives"],
+  ["fancy","🎭","תיאור","Adjectives"],["fresh","🎭","תיאור","Adjectives"],["black","🎨","צבעים","Colors"],
+  ["green","🎨","צבעים","Colors"],["dance","🏃","פעולות","Actions"],["carry","🏃","פעולות","Actions"],
+  ["catch","🏃","פעולות","Actions"],["drink","🏃","פעולות","Actions"],["drive","🚗","תחבורה","Transport"],
+  ["flash","🏃","פעולות","Actions"],["smile","🏃","פעולות","Actions"],["twist","🏃","פעולות","Actions"],
+  ["visit","🏃","פעולות","Actions"],["party","🎉","חגיגה","Fun"],["sport","⚽","ספורט","Sports"],
+  ["brain","🫀","גוף","Body"],["elbow","🫀","גוף","Body"],["magic","🎮","כיף","Fun"],
+],
+3:[
+  ["dolphin","🐾","בעלי חיים","Animals"],["chicken","🐾","בעלי חיים","Animals"],["panther","🐾","בעלי חיים","Animals"],
+  ["penguin","🐾","בעלי חיים","Animals"],["gorilla","🐾","בעלי חיים","Animals"],["leopard","🐾","בעלי חיים","Animals"],
+  ["lobster","🐾","בעלי חיים","Animals"],["hamster","🐾","בעלי חיים","Animals"],["pelican","🐾","בעלי חיים","Animals"],
+  ["sparrow","🐾","בעלי חיים","Animals"],["walrus","🐾","בעלי חיים","Animals"],
+  ["evening","🌿","טבע","Nature"],["morning","🌿","טבע","Nature"],["rainbow","🌿","טבע","Nature"],
+  ["tornado","🌤","מזג אוויר","Weather"],["glacier","🌿","טבע","Nature"],["sunrise","🌿","טבע","Nature"],
+  ["harvest","🌿","טבע","Nature"],["seasons","🌿","טבע","Nature"],["flowers","🌿","טבע","Nature"],
+  ["eclipse","🌿","טבע","Nature"],["sparkle","🌿","טבע","Nature"],
+  ["brother","👨‍👩‍👧","אנשים","People"],["captain","👔","מקצועות","Jobs"],["emperor","👔","מקצועות","Jobs"],
+  ["fighter","👔","מקצועות","Jobs"],["painter","🎨","מקצועות","Jobs"],["soldier","👔","מקצועות","Jobs"],
+  ["swimmer","⚽","ספורט","Sports"],["teacher","👔","מקצועות","Jobs"],["student","📚","בית ספר","School"],
+  ["village","🏙","מקומות","Places"],["kingdom","🏙","מקומות","Places"],["library","🏙","מקומות","Places"],
+  ["factory","🏙","מקומות","Places"],["country","🏙","מקומות","Places"],["kitchen","🏠","בית","Home"],
+  ["shelter","🏠","בית","Home"],["outside","🏙","מקומות","Places"],
+  ["battery","👜","חפצים","Things"],["compass","👜","חפצים","Things"],["crystal","💎","אבנים יקרות","Gemstones"],
+  ["diamond","💎","אבנים יקרות","Gemstones"],["lantern","👜","חפצים","Things"],["wardrobe","🏠","בית","Home"],
+  ["blanket","🏠","בית","Home"],["cabinet","🏠","בית","Home"],["surface","👜","חפצים","Things"],
+  ["fantasy","📚","בית ספר","School"],["history","📚","בית ספר","School"],["numbers","📚","בית ספר","School"],
+  ["reading","📚","בית ספר","School"],["drawing","🎨","אמנות","Art"],["episode","🎬","בידור","Entertainment"],
+  ["curious","💭","רגשות","Feelings"],["elegant","🎭","תיאור","Adjectives"],["endless","🎭","תיאור","Adjectives"],
+  ["painful","💭","רגשות","Feelings"],["serious","🎭","תיאור","Adjectives"],["strange","🎭","תיאור","Adjectives"],
+  ["typical","🎭","תיאור","Adjectives"],["unusual","🎭","תיאור","Adjectives"],["nervous","💭","רגשות","Feelings"],
+  ["natural","🎭","תיאור","Adjectives"],["similar","🎭","תיאור","Adjectives"],["healthy","🎭","תיאור","Adjectives"],
+  ["ancient","🎭","תיאור","Adjectives"],["helpful","🎭","תיאור","Adjectives"],
+  ["camping","🏕","טיולים","Outdoors"],["dancing","🎉","חגיגה","Fun"],["explore","🏕","טיולים","Outdoors"],
+  ["falling","🏃","פעולות","Actions"],["fishing","🏕","טיולים","Outdoors"],["growing","🌿","טבע","Nature"],
+  ["helping","🏃","פעולות","Actions"],["imagine","🏃","פעולות","Actions"],["journey","🏕","טיולים","Outdoors"],
+  ["playing","🎮","כיף","Fun"],["quickly","🏃","פעולות","Actions"],["sailing","🚗","תחבורה","Transport"],
+  ["skating","⚽","ספורט","Sports"],["winning","⚽","ספורט","Sports"],["freedom","💭","רגשות","Feelings"],
+  ["trouble","💭","רגשות","Feelings"],["million","📚","בית ספר","School"],["fingers","🫀","גוף","Body"],
+  ["feather","🐾","בעלי חיים","Animals"],["problem","📚","בית ספר","School"],["dressed","👗","בגדים","Clothing"],
+  ["eastern","🏙","מקומות","Places"],["western","🏙","מקומות","Places"],
+],
+4:[
+  ["adventure","🌍","עולם","World"],["beautiful","🎭","תיאור","Adjectives"],["butterfly","🐾","בעלי חיים","Animals"],
+  ["dangerous","🎭","תיאור","Adjectives"],["emergency","🏥","בריאות","Health"],["geography","📚","בית ספר","School"],
+  ["hurricane","🌤","מזג אוויר","Weather"],["invisible","🎭","תיאור","Adjectives"],["landscape","🌿","טבע","Nature"],
+  ["satellite","🔭","מדע","Science"],["submarine","🚗","תחבורה","Transport"],["telescope","🔭","מדע","Science"],
+  ["vegetable","🍎","אוכל","Food"],["waterfall","🌿","טבע","Nature"],["lightning","🌤","מזג אוויר","Weather"],
+  ["pollution","🌿","טבע","Nature"],["chocolate","🍎","אוכל","Food"],["hamburger","🍎","אוכל","Food"],
+  ["pineapple","🍎","אוכל","Food"],["strawberry","🍎","אוכל","Food"],["cinnamon","🍎","אוכל","Food"],
+  ["jellyfish","🐾","בעלי חיים","Animals"],["crocodile","🐾","בעלי חיים","Animals"],["porcupine","🐾","בעלי חיים","Animals"],
+  ["albatross","🐾","בעלי חיים","Animals"],["chimpanzee","🐾","בעלי חיים","Animals"],["tarantula","🐾","בעלי חיים","Animals"],
+  ["community","👨‍👩‍👧","אנשים","People"],["passenger","🚗","תחבורה","Transport"],["president","👔","מקצועות","Jobs"],
+  ["principal","👔","מקצועות","Jobs"],["volunteer","👔","מקצועות","Jobs"],
+  ["classroom","📚","בית ספר","School"],["difficult","🎭","תיאור","Adjectives"],["discovery","📚","בית ספר","School"],
+  ["education","📚","בית ספר","School"],["excellent","🎭","תיאור","Adjectives"],["knowledge","📚","בית ספר","School"],
+  ["necessary","🎭","תיאור","Adjectives"],["questions","📚","בית ספר","School"],["recommend","🏃","פעולות","Actions"],
+  ["obviously","🎭","תיאור","Adjectives"],["introduce","🏃","פעולות","Actions"],["literature","📚","בית ספר","School"],
+  ["afternoon","⏰","זמן","Time"],["beginning","⏰","זמן","Time"],["yesterday","⏰","זמן","Time"],
+  ["september","⏰","זמן","Time"],["centuries","⏰","זמן","Time"],
+  ["carefully","🏃","פעולות","Actions"],["classical","🎵","מוזיקה","Music"],["dedicated","💭","רגשות","Feelings"],
+  ["fantastic","💭","רגשות","Feelings"],["forgotten","💭","רגשות","Feelings"],["generally","🎭","תיאור","Adjectives"],
+  ["gradually","🎭","תיאור","Adjectives"],["happiness","💭","רגשות","Feelings"],["imaginary","🎭","תיאור","Adjectives"],
+  ["important","🎭","תיאור","Adjectives"],["nightmare","💭","רגשות","Feelings"],["perfectly","🎭","תיאור","Adjectives"],
+  ["surprised","💭","רגשות","Feelings"],["wonderful","💭","רגשות","Feelings"],["celebrate","🎉","חגיגה","Fun"],
+  ["basketball","⚽","ספורט","Sports"],["furniture","🏠","בית","Home"],["government","🏙","מקומות","Places"],
+  ["halloween","🎉","חגיגה","Fun"],["motorcycle","🚗","תחבורה","Transport"],["newspaper","📰","חדשות","News"],
+  ["operation","🏥","בריאות","Health"],["orchestra","🎵","מוזיקה","Music"],["remainder","📚","בית ספר","School"],
+  ["telephone","📱","טכנולוגיה","Technology"],["understand","🏃","פעולות","Actions"],["invention","🔭","מדע","Science"],
+],
+};
+
+// ─── HEBREW WORD BANKS [word, emoji, he-category, en-category] ──
+const WORDS_HE = {
+1:[
+  // Animals
+  ["כלב","🐾","בעלי חיים","Animals"],["פרה","🐾","בעלי חיים","Animals"],["סוס","🐾","בעלי חיים","Animals"],
+  ["כבש","🐾","בעלי חיים","Animals"],["גמל","🐾","בעלי חיים","Animals"],["נחש","🐾","בעלי חיים","Animals"],
+  ["דוב","🐾","בעלי חיים","Animals"],["נשר","🐾","בעלי חיים","Animals"],["זאב","🐾","בעלי חיים","Animals"],
+  ["צבי","🐾","בעלי חיים","Animals"],["עוף","🐾","בעלי חיים","Animals"],["פיל","🐾","בעלי חיים","Animals"],
+  ["חתול","🐾","בעלי חיים","Animals"],["ארנב","🐾","בעלי חיים","Animals"],["אריה","🐾","בעלי חיים","Animals"],
+  ["עכבר","🐾","בעלי חיים","Animals"],["חזיר","🐾","בעלי חיים","Animals"],["טווס","🐾","בעלי חיים","Animals"],
+  ["צפור","🐾","בעלי חיים","Animals"],
+  // Body
+  ["ראש","🫀","גוף","Body"],["רגל","🫀","גוף","Body"],["עין","🫀","גוף","Body"],
+  ["שפה","🫀","גוף","Body"],["לחי","🫀","גוף","Body"],["ברך","🫀","גוף","Body"],
+  ["אוזן","🫀","גוף","Body"],["אצבע","🫀","גוף","Body"],
+  // Colors
+  ["לבן","🎨","צבעים","Colors"],["חום","🎨","צבעים","Colors"],["אדום","🎨","צבעים","Colors"],
+  ["כחול","🎨","צבעים","Colors"],["ירוק","🎨","צבעים","Colors"],["שחור","🎨","צבעים","Colors"],
+  ["צהוב","🎨","צבעים","Colors"],["כתום","🎨","צבעים","Colors"],["סגול","🎨","צבעים","Colors"],
+  ["ורוד","🎨","צבעים","Colors"],
+  // Nature
+  ["שמש","🌿","טבע","Nature"],["ירח","🌿","טבע","Nature"],["גשם","🌿","טבע","Nature"],
+  ["ענן","🌿","טבע","Nature"],["רוח","🌿","טבע","Nature"],["שלג","🌿","טבע","Nature"],
+  ["נהר","🌿","טבע","Nature"],["חוף","🌿","טבע","Nature"],["כוכב","🌿","טבע","Nature"],
+  ["אדמה","🌿","טבע","Nature"],
+  // Food
+  ["לחם","🍎","אוכל","Food"],["חלב","🍎","אוכל","Food"],["בצל","🍎","אוכל","Food"],
+  ["גזר","🍎","אוכל","Food"],["פרי","🍎","אוכל","Food"],["דבש","🍎","אוכל","Food"],
+  ["תות","🍎","אוכל","Food"],["אגס","🍎","אוכל","Food"],["תפוח","🍎","אוכל","Food"],
+  ["ביצה","🍎","אוכל","Food"],
+  // Family
+  ["אמא","👨‍👩‍👧","משפחה","Family"],["אבא","👨‍👩‍👧","משפחה","Family"],["סבא","👨‍👩‍👧","משפחה","Family"],
+  ["ילד","👨‍👩‍👧","משפחה","Family"],["חבר","👨‍👩‍👧","משפחה","Family"],["סבתא","👨‍👩‍👧","משפחה","Family"],
+  ["אחות","👨‍👩‍👧","משפחה","Family"],
+  // Things
+  ["ספר","👜","חפצים","Things"],["כוס","👜","חפצים","Things"],["פנס","👜","חפצים","Things"],
+  ["מפה","👜","חפצים","Things"],["דלת","👜","חפצים","Things"],["נעל","👜","חפצים","Things"],
+  ["שיר","🎵","מוזיקה","Music"],["כדור","⚽","ספורט","Sports"],["מיטה","🏠","בית","Home"],
+  // Places
+  ["בית","🏠","בית","Home"],["חדר","🏠","בית","Home"],["חצר","🏠","בית","Home"],
+  ["גשר","🏙","מקומות","Places"],["שוק","🏙","מקומות","Places"],
+],
+2:[
+  // Animals
+  ["ינשוף","🐾","בעלי חיים","Animals"],["עורב","🐾","בעלי חיים","Animals"],["תנין","🐾","בעלי חיים","Animals"],
+  ["כריש","🐾","בעלי חיים","Animals"],["פרפר","🐾","בעלי חיים","Animals"],["תוכי","🐾","בעלי חיים","Animals"],
+  ["עכביש","🐾","בעלי חיים","Animals"],["ברבור","🐾","בעלי חיים","Animals"],["ברווז","🐾","בעלי חיים","Animals"],
+  ["קיפוד","🐾","בעלי חיים","Animals"],["חמור","🐾","בעלי חיים","Animals"],
+  // Food
+  ["עוגה","🍎","אוכל","Food"],["גלידה","🍎","אוכל","Food"],["תפוז","🍎","אוכל","Food"],
+  ["ירקות","🍎","אוכל","Food"],["פירות","🍎","אוכל","Food"],["דגים","🍎","אוכל","Food"],
+  ["תירס","🍎","אוכל","Food"],["מנגו","🍎","אוכל","Food"],["בננה","🍎","אוכל","Food"],
+  ["פלפל","🍎","אוכל","Food"],["שוקו","🍎","אוכל","Food"],["בשר","🍎","אוכל","Food"],
+  ["גבינה","🍎","אוכל","Food"],
+  // School
+  ["כיסא","📚","בית ספר","School"],["שולחן","📚","בית ספר","School"],["מורה","👔","מקצועות","Jobs"],
+  ["תלמיד","📚","בית ספר","School"],["ספסל","📚","בית ספר","School"],["מחשב","📱","טכנולוגיה","Technology"],
+  ["מגרש","🏙","מקומות","Places"],["מבחן","📚","בית ספר","School"],["כיתה","📚","בית ספר","School"],
+  ["מדבקה","🎨","אמנות","Art"],
+  // Home
+  ["מטבח","🏠","בית","Home"],["חלון","🏠","בית","Home"],["בריכה","🏊","ספורט","Sports"],
+  ["גינה","🌿","טבע","Nature"],["מקרר","🏠","בית","Home"],["תנור","🏠","בית","Home"],
+  ["שטיח","🏠","בית","Home"],["מגבת","🏠","בית","Home"],["כרית","🏠","בית","Home"],
+  // Things
+  ["צלחת","👜","חפצים","Things"],["מזלג","👜","חפצים","Things"],["כפית","👜","חפצים","Things"],
+  ["סכין","👜","חפצים","Things"],["מתנה","🎁","מתנות","Gifts"],["כרטיס","👜","חפצים","Things"],
+  ["בלון","🎈","כיף","Fun"],["שקית","👜","חפצים","Things"],["כובע","👗","בגדים","Clothing"],
+  ["שמלה","👗","בגדים","Clothing"],["חולצה","👗","בגדים","Clothing"],["מסרק","👜","חפצים","Things"],
+  ["ארנק","👜","חפצים","Things"],
+  // Places
+  ["מלון","🏙","מקומות","Places"],["מטוס","🚗","תחבורה","Transport"],["מדבר","🌿","טבע","Nature"],
+  ["מגדל","🏙","מקומות","Places"],["חנות","🏙","מקומות","Places"],["מרכז","🏙","מקומות","Places"],
+  ["מסוק","🚗","תחבורה","Transport"],
+  // Other
+  ["ריצה","🏃","ספורט","Sports"],["שחייה","🏊","ספורט","Sports"],["ריקוד","💃","ריקוד","Dance"],
+  ["חגיגה","🎉","חגיגה","Celebration"],["ספורט","⚽","ספורט","Sports"],["גיבור","👨‍👩‍👧","אנשים","People"],
+  ["שמחה","💭","רגשות","Feelings"],["אומץ","💭","רגשות","Feelings"],["טלפון","📱","טכנולוגיה","Technology"],
+  ["מפתח","👜","חפצים","Things"],["שמיכה","🏠","בית","Home"],["אוהל","🏕","טיולים","Outdoors"],
+  ["תחנה","🚗","תחבורה","Transport"],["כרית","🏠","בית","Home"],
+],
+3:[
+  // Animals
+  ["דולפין","🐾","בעלי חיים","Animals"],["טיגריס","🐾","בעלי חיים","Animals"],["קנגורו","🐾","בעלי חיים","Animals"],
+  ["ארנבות","🐾","בעלי חיים","Animals"],["תנינים","🐾","בעלי חיים","Animals"],["כרישים","🐾","בעלי חיים","Animals"],
+  // Food
+  ["שוקולד","🍎","אוכל","Food"],["מלפפון","🍎","אוכל","Food"],["אבטיח","🍎","אוכל","Food"],
+  ["קישוא","🍎","אוכל","Food"],["אבוקדו","🍎","אוכל","Food"],["שעועית","🍎","אוכל","Food"],
+  // School/Sports
+  ["כדורגל","⚽","ספורט","Sports"],["כדורסל","🏀","ספורט","Sports"],["עיתון","📰","חדשות","News"],
+  ["מחברת","📚","בית ספר","School"],["ציורים","🎨","אמנות","Art"],["ספרייה","📚","בית ספר","School"],
+  ["חנוכה","🕎","חגיגה","Celebration"],
+  // Places
+  ["מסעדה","🏙","מקומות","Places"],["מסדרון","🏠","בית","Home"],["ממלכה","🏙","מקומות","Places"],
+  // Home/Things
+  ["נדנדה","🎮","כיף","Fun"],["מגלשה","🎮","כיף","Fun"],["קרוסלה","🎮","כיף","Fun"],
+  ["מגפיים","👗","בגדים","Clothing"],["מכנסים","👗","בגדים","Clothing"],["גרביים","👗","בגדים","Clothing"],
+  ["כיסאות","🏠","בית","Home"],["מזוודה","🧳","טיולים","Travel"],["מטריה","🌂","חפצים","Things"],
+  ["אמבטיה","🏠","בית","Home"],["ממתקים","🍬","אוכל","Food"],["רהיטים","🏠","בית","Home"],
+  ["מקלחת","🏠","בית","Home"],["ברקים","🌩","מזג אוויר","Weather"],
+  // Fun/Fantasy
+  ["נסיכה","👑","דמיון","Fantasy"],["מכשפה","🧙","דמיון","Fantasy"],["מפלצת","👹","דמיון","Fantasy"],
+  ["ספינה","⚓","תחבורה","Transport"],["דרקון","🐉","דמיון","Fantasy"],["ארמון","🏰","מקומות","Places"],
+  ["שרביט","✨","דמיון","Fantasy"],
+  // Transport/Services
+  ["כבאית","🚒","תחבורה","Transport"],["משטרה","👮","מקצועות","Jobs"],
+  // Feelings/Abstract
+  ["חופשה","🌴","טיולים","Travel"],["משפחה","👨‍👩‍👧","משפחה","Family"],["ממשלה","🏛","מקומות","Places"],
+  ["תרופה","🏥","בריאות","Health"],["הצלחה","💭","רגשות","Feelings"],["עצבות","💭","רגשות","Feelings"],
+  ["גבורה","💭","רגשות","Feelings"],
+  // Plurals/More words
+  ["ילדים","👨‍👩‍👧","משפחה","Family"],["מורים","👔","מקצועות","Jobs"],["ספרים","📚","בית ספר","School"],
+  ["כדורים","⚽","ספורט","Sports"],["שירים","🎵","מוזיקה","Music"],["חברים","👨‍👩‍👧","משפחה","Family"],
+  ["פרחים","🌸","טבע","Nature"],["מבחנים","📚","בית ספר","School"],["כוכבים","🌟","טבע","Nature"],
+  ["מוזיקה","🎵","מוזיקה","Music"],["תגלית","🔭","מדע","Science"],["נסיעה","🚗","תחבורה","Transport"],
+  ["בגדים","👗","בגדים","Clothing"],["חדשות","📰","חדשות","News"],["משחקים","🎮","כיף","Fun"],
+  ["מחשבים","📱","טכנולוגיה","Technology"],["טיולים","🏕","טיולים","Outdoors"],["פסטיבל","🎉","חגיגה","Celebration"],
+  ["ספינות","⚓","תחבורה","Transport"],["חרבות","⚔","חפצים","Things"],["ניצחון","🏆","ספורט","Sports"],
+],
+4:[
+  // Places
+  ["ירושלים","🏙","מקומות","Places"],["גלידריה","🍦","מקומות","Places"],["אקווריום","🐠","מקומות","Places"],
+  ["מוזיאון","🏛","מקומות","Places"],["שולחנות","🏠","בית","Home"],["אצטדיון","⚽","ספורט","Sports"],
+  ["משחקייה","🎮","כיף","Fun"],["בניינים","🏠","מקומות","Places"],["ארמונות","🏰","דמיון","Fantasy"],
+  ["מלכויות","👑","דמיון","Fantasy"],
+  // Transport
+  ["אוטובוס","🚌","תחבורה","Transport"],["אמבולנס","🚑","בריאות","Health"],["מכוניות","🚗","תחבורה","Transport"],
+  // Technology
+  ["טלוויזיה","📺","טכנולוגיה","Technology"],["אינטרנט","💻","טכנולוגיה","Technology"],
+  ["אוזניות","🎧","טכנולוגיה","Technology"],["מכשירים","📱","טכנולוגיה","Technology"],
+  // Food
+  ["שוקולדים","🍫","אוכל","Food"],["עגבנייה","🍅","אוכל","Food"],["מלפפונים","🥒","אוכל","Food"],
+  // Celebrations
+  ["חנוכייה","🕎","חגיגה","Celebration"],["פסטיבלים","🎉","חגיגה","Celebration"],["ניצחונות","🏆","ספורט","Sports"],
+  // Animals
+  ["ציפורים","🐦","בעלי חיים","Animals"],["פינגווין","🐧","בעלי חיים","Animals"],["ארנבונים","🐰","בעלי חיים","Animals"],
+  ["צפרדעים","🐸","בעלי חיים","Animals"],["קיפודים","🦔","בעלי חיים","Animals"],["כדורגלים","⚽","ספורט","Sports"],
+  // People/Jobs
+  ["מנהיגים","👔","מקצועות","Jobs"],["מתנדבים","👔","מקצועות","Jobs"],["כדורסלן","🏀","ספורט","Sports"],
+  ["כדורגלן","⚽","ספורט","Sports"],["גיבורים","👑","דמיון","Fantasy"],["ספורטאים","⚽","ספורט","Sports"],
+  ["ספורטאות","⚽","ספורט","Sports"],["שחקניות","🎭","בידור","Entertainment"],["מוזיקאים","🎵","מוזיקה","Music"],
+  ["מוזיקאי","🎵","מוזיקה","Music"],
+  // Objects
+  ["כרטיסים","🎟","חפצים","Things"],["בקבוקים","🍶","חפצים","Things"],["שרשראות","💎","תכשיטים","Jewelry"],
+  ["אמבטיות","🏠","בית","Home"],["אוניפורם","👗","בגדים","Clothing"],["תקליטים","🎵","מוזיקה","Music"],
+  ["תוכניות","📺","בידור","Entertainment"],["חצוצרות","🎺","מוזיקה","Music"],
+  // School/Science
+  ["תלמידים","📚","בית ספר","School"],["שיעורים","📚","בית ספר","School"],["ריקודים","💃","ריקוד","Dance"],
+  ["ניסויים","🔭","מדע","Science"],["מסלולים","🔭","מדע","Science"],["דמיונות","💭","רגשות","Feelings"],
+  ["כישופים","🧙","דמיון","Fantasy"],
+],
+};
+
+// deduplicate each level for both banks
+for(const bank of [WORDS, WORDS_HE]){
+  for(const lvl of Object.keys(bank)){
+    const seen=new Set();
+    bank[lvl]=bank[lvl].filter(([w])=>{if(seen.has(w))return false;seen.add(w);return true;});
+  }
+}
+
+// ─── GAME STATE ───────────────────────────────────────────
+const state={level:1,word:"",wordEntry:null,guessed:new Set(),wrong:0,maxWrong:6,gameOver:false,won:false};
+
+function getMaxWrong(len){ return len<=4?8:len<=6?7:6; }
+function getPool(level){ return lang==="he"?WORDS_HE[level]:WORDS[level]; }
+
+// ─── LANG ─────────────────────────────────────────────────
+function setLang(l){
+  lang=l;
+  document.querySelectorAll(".lang-btn").forEach(b=>{
+    b.classList.toggle("active",b.onclick.toString().includes(`'${l}'`));
+  });
+  applyTranslations();
+  if(document.getElementById("screen-game").classList.contains("active")){
+    goToLevelSelect();
+  }
+}
+
+function applyTranslations(){
+  const t=T[lang],isHe=lang==="he";
+  document.documentElement.lang=isHe?"he":"en";
+  document.documentElement.dir=isHe?"rtl":"ltr";
+  document.getElementById("t-title").textContent=t.title;
+  document.getElementById("t-subtitle").textContent=t.subtitle;
+  for(let i=1;i<=4;i++){
+    document.getElementById("t-l"+i+"name").textContent=t.lnames[i-1];
+    document.getElementById("t-l"+i+"da").textContent=t.ldesca[i-1];
+    document.getElementById("t-l"+i+"db").textContent=t.ldescb[i-1];
+  }
+  document.getElementById("t-hintbtn").textContent=t.hintbtn;
+  document.getElementById("t-newgame").textContent=t.newgame;
+  document.getElementById("ol-again").textContent=t.playAgain;
+  document.getElementById("ol-level").textContent=t.changeLevel;
+}
+
+// ─── SCREENS ──────────────────────────────────────────────
+function showScreen(id){
+  document.querySelectorAll(".screen").forEach(s=>s.classList.remove("active"));
+  document.getElementById(id).classList.add("active");
+}
+function goToLevelSelect(){
+  document.removeEventListener("keydown",keyHandler);
+  showScreen("screen-level");
+}
+
+// ─── START GAME ───────────────────────────────────────────
+function startGame(level){
+  const pool=getPool(level);
+  const entry=pool[Math.floor(Math.random()*pool.length)];
+  state.level=level;
+  state.word=lang==="he"?entry[0]:entry[0].toUpperCase();
+  state.wordEntry=entry;
+  state.guessed=new Set();
+  state.wrong=0;
+  state.maxWrong=getMaxWrong(entry[0].length);
+  state.gameOver=false;
+  state.won=false;
+
+  renderLevelTag();
+  document.getElementById("overlay").classList.remove("show");
+  document.getElementById("hint-text").classList.remove("visible");
+  document.getElementById("hint-btn").style.display="";
+  applyTranslations();
+
+  renderHangman();
+  renderWord();
+  renderLives();
+  renderWrong();
+  renderKeyboard();
+
+  document.removeEventListener("keydown",keyHandler);
+  document.addEventListener("keydown",keyHandler);
+  showScreen("screen-game");
+}
+
+function renderLevelTag(){
+  const tag=document.getElementById("level-tag");
+  const icons=["","🌱","⭐","🔥","💎"];
+  tag.textContent=T[lang].levelTags[state.level-1]+" "+icons[state.level];
+  tag.className="level-tag l"+state.level;
+}
+
+// ─── HINT ────────────────────────────────────────────────
+function showHint(){
+  const [,emoji,hecat,encat]=state.wordEntry;
+  const ht=document.getElementById("hint-text");
+  ht.textContent=emoji+" "+(lang==="he"?hecat:encat);
+  ht.classList.add("visible");
+  document.getElementById("hint-btn").style.display="none";
+}
+
+// ─── KEYBOARD INPUT ───────────────────────────────────────
+function keyHandler(e){
+  if(state.gameOver)return;
+  if(lang==="he"){
+    const l=e.key;
+    if(HE_LETTERS.includes(l)){handleGuess(l);return;}
+    if(SOFIT_TO_BASE[l]){handleGuess(SOFIT_TO_BASE[l]);return;}
+  }else{
+    const l=e.key.toUpperCase();
+    if(/^[A-Z]$/.test(l))handleGuess(l);
+  }
+}
+
+// ─── HANDLE GUESS ─────────────────────────────────────────
+function handleGuess(letter){
+  if(state.gameOver||state.guessed.has(letter))return;
+  state.guessed.add(letter);
+  if(!wordContainsGuess(state.word,letter))state.wrong++;
+  renderHangman();
+  renderWord(letter);
+  renderLives();
+  renderWrong();
+  updateKeyButton(letter);
+  if(checkWin()){state.won=true;state.gameOver=true;setTimeout(showResult,400);}
+  else if(state.wrong>=state.maxWrong){state.gameOver=true;setTimeout(showResult,400);}
+}
+
+// ─── RENDER ───────────────────────────────────────────────
+function renderHangman(){
+  for(let i=0;i<8;i++){
+    const el=document.getElementById("hp"+i);
+    if(!el)continue;
+    el.style.opacity=(i<state.maxWrong&&state.wrong>i)?"1":"0";
+  }
+}
+
+function renderWord(newLetter){
+  const el=document.getElementById("word-display");
+  el.innerHTML="";
+  for(const ch of state.word){
+    const slot=document.createElement("div");slot.className="letter-slot";
+    const rev=document.createElement("div");rev.className="revealed";
+    const revealed=lang==="he"?isLetterRevealed(ch,state.guessed):state.guessed.has(ch);
+    if(revealed){
+      rev.textContent=ch;
+      const isNew=lang==="he"?(newLetter&&baseForm(ch)===newLetter):(ch===newLetter);
+      if(isNew)rev.classList.add("pop");
+    }
+    const u=document.createElement("div");u.className="underline";
+    slot.append(rev,u);el.appendChild(slot);
+  }
+}
+
+function renderLives(){
+  const bar=document.getElementById("lives-bar");bar.innerHTML="";
+  for(let i=0;i<state.maxWrong;i++){
+    const s=document.createElement("span");
+    s.className="life"+(i<state.wrong?" lost":"");
+    s.textContent="❤️";bar.appendChild(s);
+  }
+}
+
+function renderWrong(){
+  const wrongs=[...state.guessed].filter(l=>!wordContainsGuess(state.word,l));
+  const t=T[lang];
+  document.getElementById("wrong-label").textContent=
+    wrongs.length?`${t.wronglabel} (${state.wrong}/${state.maxWrong}):` :"";
+  const c=document.getElementById("wrong-letters");c.innerHTML="";
+  wrongs.forEach(l=>{
+    const s=document.createElement("span");s.className="wrong-letter";s.textContent=l;c.appendChild(s);
+  });
+}
+
+function renderKeyboard(){
+  const kb=document.getElementById("keyboard");kb.innerHTML="";
+  const letters=lang==="he"?HE_LETTERS:Array.from({length:26},(_,i)=>String.fromCharCode(65+i));
+  letters.forEach(l=>{
+    const b=document.createElement("button");
+    b.id="key-"+l;b.className="key-btn";b.textContent=l;
+    b.onclick=()=>handleGuess(l);kb.appendChild(b);
+  });
+}
+
+function updateKeyButton(letter){
+  const b=document.getElementById("key-"+letter);
+  if(!b)return;
+  b.disabled=true;
+  b.classList.add(wordContainsGuess(state.word,letter)?"correct":"wrong");
+}
+
+function checkWin(){
+  return [...state.word].every(ch=>isLetterRevealed(ch,state.guessed));
+}
+
+// ─── RESULT OVERLAY ───────────────────────────────────────
+function renderOverlayText(){
+  if(!state.gameOver)return;
+  const t=T[lang];
+  document.getElementById("ol-emoji").textContent=state.won?"🎉":"😢";
+  const titleEl=document.getElementById("ol-title");
+  titleEl.textContent=state.won?t.winTitle:t.loseTitle;
+  titleEl.className="overlay-title "+(state.won?"win":"lose");
+  document.getElementById("ol-word").textContent=state.word;
+  document.getElementById("ol-sub").textContent=t.wordWas;
+  document.getElementById("ol-again").textContent=t.playAgain;
+  document.getElementById("ol-level").textContent=t.changeLevel;
+}
+
+function showResult(){
+  renderOverlayText();
+  document.getElementById("overlay").classList.add("show");
+}
+
+// init
+applyTranslations();
+</script>
+</body>
+</html>

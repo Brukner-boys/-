@@ -1,32 +1,100 @@
 <!DOCTYPE html>
-<html lang="he">
+<html lang="he" dir="rtl">
 <head>
   <meta charset="UTF-8" />
-  <title>אתר המשחקים של ברוקנר </title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>אתר המשחקים של ברוקנר</title>
   <style>
+    * { box-sizing: border-box; }
     body {
-      text-align: center;
-      font-family: Arial;
-      background: #f0f0f0;
+      margin: 0;
+      font-family: "Rubik", Arial, sans-serif;
+      background: linear-gradient(160deg, #f4f6fb, #e8ecf6);
+      color: #2b3648;
+      min-height: 100vh;
     }
     h1 {
-      margin-top: 50px;
+      text-align: center;
+      margin: 0;
+      padding: 44px 20px 8px;
+      font-size: clamp(1.8rem, 5vw, 2.8rem);
+      background: linear-gradient(90deg, #ff5c8a, #ff8a5c);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      font-weight: 800;
     }
-    .game-list a {
-      display: block;
-      margin: 20px;
-      font-size: 20px;
-      color: blue;
+    .subtitle { text-align: center; color: #7a8494; margin: 0 0 30px; font-size: 1.05rem; }
+
+    .game-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+      gap: 26px;
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 0 24px 60px;
+    }
+    .game-card {
+      display: flex;
+      flex-direction: column;
       text-decoration: none;
+      color: inherit;
+      background: #ffffff;
+      border-radius: 18px;
+      overflow: hidden;
+      box-shadow: 0 6px 20px rgba(43, 54, 72, 0.1);
+      transition: transform .15s ease, box-shadow .15s ease;
+      border: 1px solid rgba(43, 54, 72, 0.06);
+    }
+    .game-card:hover {
+      transform: translateY(-6px);
+      box-shadow: 0 14px 34px rgba(43, 54, 72, 0.2);
+    }
+    .thumb {
+      width: 100%;
+      aspect-ratio: 400 / 260;
+      object-fit: cover;
+      display: block;
+      background: #241640;
+    }
+    .game-name {
+      padding: 16px 14px;
+      text-align: center;
+      font-size: 1.2rem;
+      font-weight: 700;
+    }
+    .badge {
+      display: inline-block;
+      margin-inline-start: 6px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: #fff;
+      background: #ff5c8a;
+      padding: 2px 8px;
+      border-radius: 10px;
+      vertical-align: middle;
     }
   </style>
 </head>
 <body>
-  <h1>ברוכים הבאים לאתר המשחקים של ברוקנר!</h1>
+  <h1>אתר המשחקים של ברוקנר 🎮</h1>
+  <p class="subtitle">בחרו משחק והתחילו לשחק!</p>
+
   <div class="game-list">
-    <a href="ski-game.html">🎿 כדור ביער</a>
-    <a href="hangman.html">איש תלוי 🧍</a>
-    <a href="https://double-game.onrender.com" target="_blank" rel="noopener">🎯 דאבל (אונליין - מרובה משתתפים)</a>
+    <a class="game-card" href="https://double-game.onrender.com" target="_blank" rel="noopener">
+      <img class="thumb" src="thumbs/double.svg" alt="דאבל" />
+      <span class="game-name">🎯 דאבל <span class="badge">אונליין</span></span>
+    </a>
+
+    <a class="game-card" href="ski-game.html">
+      <img class="thumb" src="thumbs/ski.svg" alt="כדור ביער" />
+      <span class="game-name">🎿 כדור ביער</span>
+    </a>
+
+    <a class="game-card" href="hangman.html">
+      <img class="thumb" src="thumbs/hangman.svg" alt="איש תלוי" />
+      <span class="game-name">🧍 איש תלוי</span>
+    </a>
   </div>
 </body>
 </html>
